@@ -1,0 +1,51 @@
+version: "3.9"
+services:
+  blockchain:
+    image: node:18
+    working_dir: /usr/src/app
+    volumes: [ "./blockchain:/usr/src/app" ]
+    command: sh -c "npm install && npx hardhat node"
+    ports: [ "8545:8545" ]
+
+  deploy:
+    image: node:18
+    working_dir: /usr/src/app
+    depends_on: [ blockchain ]
+    volumes: [ "./blockchain:/usr/src/app", "./backend:/usr/src/app/backend" ]
+    command: sh -c "npx hardhat run scripts/deploy.js --network localhost"
+
+  coordinator:
+    build: { context: ".", dockerfile: "Dockerfile.backend" }
+    depends_on: [ deploy ]
+    environment: [ "RPC_URL=http://blockchain:8545" ]
+    volumes: [ "./backend:/app/backend" ]
+    ports: [ "8080:8080" ]
+
+  client1:
+    build: { context: ".", dockerfile: "Dockerfile.backend" }
+    command: python -m backend.client.client --partition 0 --total 3
+    depends_on: [ coordinator ]
+    environment: [ "RPC_URL=http://blockchain:8545" ]
+    volumes: [ "./backend:/app/backend" ]
+
+  client2:
+    build: { context: ".", dockerfile: "Dockerfile.backend" }
+    command: python -m backend.client.client --partition 1 --total 3
+    depends_on: [ coordinator ]
+    environment: [ "RPC_URL=http://blockchain:8545" ]
+    volumes: [ "./backend:/app/backend" ]
+
+  client3:
+    build: { context: ".", dockerfile: "Dockerfile.backend" }
+    command: python -m backend.client.client --partition 2 --total 3
+    depends_on: [ coordinator ]
+    environment: [ "RPC_URL=http://blockchain:8545" ]
+    volumes: [ "./backend:/app/backend" ]
+
+  dashboard:
+    image: node:18
+    working_dir: /usr/src/app
+    depends_on: [ deploy ]
+    volumes: [ "./dashboard:/usr/src/app", "./backend:/usr/src/app/backend" ]
+    command: sh -c "npm install && npm run dev"
+    ports: [ "3000:3000" ]
